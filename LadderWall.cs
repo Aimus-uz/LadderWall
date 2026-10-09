@@ -11,17 +11,15 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.0.0";
+    public override string ModuleVersion => "1.0.1";
 
     private const string MapName = "awp_lego";
 
-    // Модель-"кирпич". Если не спавнится, замените на любую модель, которая есть на карте/в игре
     private const string Model = "models/props/de_dust/hr_dust/dust_crates/dust_crate_style_01_32x32x32.vmdl";
 
-    // Позиции стен (X, Y, Z) и поворот Yaw. Заполнить после замера через !wall
     private readonly List<(Vector pos, QAngle ang)> _walls = new()
     {
-        // (new Vector(0, 0, 0), new QAngle(0, 0, 0)),
+        (new Vector(1707, 248, 62), new QAngle(0, -81, 0)),
     };
 
     public override void Load(bool hotReload)
@@ -50,7 +48,6 @@ public class LadderWall : BasePlugin
         prop.Teleport(pos, ang, new Vector(0, 0, 0));
         prop.DispatchSpawn();
 
-        // невидимый, но с коллизией
         prop.Render = Color.FromArgb(0, 255, 255, 255);
         Utilities.SetStateChanged(prop, "CBaseModelEntity", "m_clrRender");
 
@@ -60,7 +57,6 @@ public class LadderWall : BasePlugin
         return prop;
     }
 
-    // Пробная стена там, где стоите. Видимая, чтобы подогнать позицию.
     [ConsoleCommand("css_wall", "Поставить пробную стену")]
     [RequiresPermissions("@css/root")]
     public void OnWall(CCSPlayerController? player, CommandInfo cmd)
@@ -73,7 +69,7 @@ public class LadderWall : BasePlugin
         var prop = Spawn(new Vector(o.X, o.Y, o.Z), new QAngle(0, a.Y, 0));
         if (prop != null)
         {
-            prop.Render = Color.FromArgb(120, 255, 0, 0); // полупрозрачный красный для теста
+            prop.Render = Color.FromArgb(120, 255, 0, 0);
             Utilities.SetStateChanged(prop, "CBaseModelEntity", "m_clrRender");
         }
 
