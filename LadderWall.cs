@@ -55,8 +55,7 @@ public class LadderWall : BasePlugin
         Utilities.SetStateChanged(prop, "CBaseModelEntity", "m_clrRender");
 
         prop.Collision.SolidType = SolidType_t.SOLID_VPHYSICS;
-        prop.Collision.CollisionGroup = (byte)CollisionGroup.COLLISION_GROUP_DEFAULT;
-        Utilities.SetStateChanged(prop, "CCollisionProperty", "m_CollisionGroup");
+        Utilities.SetStateChanged(prop, "CCollisionProperty", "m_nSolidType");
 
         return prop;
     }
