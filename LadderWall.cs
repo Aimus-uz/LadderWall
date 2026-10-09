@@ -11,12 +11,11 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.0.2";
+    public override string ModuleVersion => "1.0.3";
 
     // Пока true, стены из списка красные и видимые. Когда всё проверите, поставьте false
     private const bool Debug = true;
 
-    // Часть имени карты. Если карта называется иначе, спавн всё равно пойдёт (см. SpawnWalls)
     private const string MapPart = "lego";
 
     private const string Model = "models/props/de_dust/hr_dust/dust_crates/dust_crate_style_01_32x32x32.vmdl";
@@ -26,21 +25,36 @@ public class LadderWall : BasePlugin
         (new Vector(1707, 248, 62), new QAngle(0, -81, 0)),
     };
 
+    // true только после загрузки карты, когда модель прекэширована
+    private bool _modelReady = false;
+
     public override void Load(bool hotReload)
     {
+        RegisterListener<Listeners.OnServerPrecacheResources>(manifest =>
+        {
+            manifest.AddResource(Model);
+            _modelReady = true;
+        });
+
+        RegisterListener<Listeners.OnMapEnd>(() => _modelReady = false);
+
         RegisterEventHandler<EventRoundStart>((e, i) =>
         {
             AddTimer(1.0f, SpawnWalls);
             return HookResult.Continue;
         });
-
-        if (hotReload) SpawnWalls();
     }
 
     private void SpawnWalls()
     {
         var map = Server.MapName ?? "";
-        Console.WriteLine($"[LadderWall] map='{map}', walls={_walls.Count}");
+        Console.WriteLine($"[LadderWall] map='{map}', walls={_walls.Count}, modelReady={_modelReady}");
+
+        if (!_modelReady)
+        {
+            Console.WriteLine("[LadderWall] model not precached yet, change map once");
+            return;
+        }
 
         if (!map.Contains(MapPart, StringComparison.OrdinalIgnoreCase))
         {
@@ -82,6 +96,12 @@ public class LadderWall : BasePlugin
     [RequiresPermissions("@css/root")]
     public void OnWall(CCSPlayerController? player, CommandInfo cmd)
     {
+        if (!_modelReady)
+        {
+            player?.PrintToChat(" [wall] model not ready, change map once");
+            return;
+        }
+
         var pawn = player?.PlayerPawn.Value;
         var o = pawn?.AbsOrigin;
         var a = pawn?.EyeAngles;
@@ -101,7 +121,7 @@ public class LadderWall : BasePlugin
     [RequiresPermissions("@css/root")]
     public void OnInfo(CCSPlayerController? player, CommandInfo cmd)
     {
-        player?.PrintToChat($" [wall] map='{Server.MapName}' walls={_walls.Count}");
+        player?.PrintToChat($" [wall] map='{Server.MapName}' walls={_walls.Count} modelReady={_modelReady}");
     }
 
     [ConsoleCommand("css_wallspawn", "Заспавнить стены сейчас")]
@@ -109,6 +129,6 @@ public class LadderWall : BasePlugin
     public void OnSpawnNow(CCSPlayerController? player, CommandInfo cmd)
     {
         SpawnWalls();
-        player?.PrintToChat(" [wall] spawned");
+        player?.PrintToChat(" [wall] spawn called");
     }
 }
