@@ -11,9 +11,13 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.0.1";
+    public override string ModuleVersion => "1.0.2";
 
-    private const string MapName = "awp_lego";
+    // Пока true, стены из списка красные и видимые. Когда всё проверите, поставьте false
+    private const bool Debug = true;
+
+    // Часть имени карты. Если карта называется иначе, спавн всё равно пойдёт (см. SpawnWalls)
+    private const string MapPart = "lego";
 
     private const string Model = "models/props/de_dust/hr_dust/dust_crates/dust_crate_style_01_32x32x32.vmdl";
 
@@ -35,8 +39,25 @@ public class LadderWall : BasePlugin
 
     private void SpawnWalls()
     {
-        if (Server.MapName != MapName) return;
-        foreach (var (pos, ang) in _walls) Spawn(pos, ang);
+        var map = Server.MapName ?? "";
+        Console.WriteLine($"[LadderWall] map='{map}', walls={_walls.Count}");
+
+        if (!map.Contains(MapPart, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("[LadderWall] map does not match, skip");
+            return;
+        }
+
+        foreach (var (pos, ang) in _walls)
+        {
+            var p = Spawn(pos, ang);
+            if (p == null) { Console.WriteLine("[LadderWall] spawn FAILED"); continue; }
+            if (Debug)
+            {
+                p.Render = Color.FromArgb(120, 255, 0, 0);
+                Utilities.SetStateChanged(p, "CBaseModelEntity", "m_clrRender");
+            }
+        }
     }
 
     private static CDynamicProp? Spawn(Vector pos, QAngle ang)
@@ -74,5 +95,20 @@ public class LadderWall : BasePlugin
         }
 
         player.PrintToChat($" [wall] X={o.X:F0} Y={o.Y:F0} Z={o.Z:F0} Yaw={a.Y:F0}");
+    }
+
+    [ConsoleCommand("css_wallinfo", "Инфо о карте и стенах")]
+    [RequiresPermissions("@css/root")]
+    public void OnInfo(CCSPlayerController? player, CommandInfo cmd)
+    {
+        player?.PrintToChat($" [wall] map='{Server.MapName}' walls={_walls.Count}");
+    }
+
+    [ConsoleCommand("css_wallspawn", "Заспавнить стены сейчас")]
+    [RequiresPermissions("@css/root")]
+    public void OnSpawnNow(CCSPlayerController? player, CommandInfo cmd)
+    {
+        SpawnWalls();
+        player?.PrintToChat(" [wall] spawned");
     }
 }
