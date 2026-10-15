@@ -11,18 +11,26 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.0.5";
+    public override string ModuleVersion => "1.1.1";
 
-    // false = стены из списка полностью невидимые
+    // false = стены из списка полностью невидимые, true = красные (для проверки)
     private const bool Debug = false;
-
-    private const string MapPart = "lego";
 
     private const string Model = "models/props/de_dust/hr_dust/dust_crates/dust_crate_style_01_32x32x32.vmdl";
 
-    private readonly List<(Vector pos, QAngle ang)> _walls = new()
+    // Стены по названию карты. Название смотреть через !wallinfo
+    private readonly Dictionary<string, List<(Vector pos, QAngle ang)>> _maps =
+        new(StringComparer.OrdinalIgnoreCase)
     {
-        (new Vector(1704, 244, 92), new QAngle(0, -85, 0)),
+        ["awp_lego_2"] = new()
+        {
+            (new Vector(1704, 244, 92), new QAngle(0, -85, 0)),
+        },
+
+        ["awp_lego_2_winter"] = new()
+        {
+            (new Vector(-88, 5, 311), new QAngle(0, -81, 0)),
+        },
     };
 
     public override void Load(bool hotReload)
@@ -42,15 +50,16 @@ public class LadderWall : BasePlugin
     private void SpawnWalls()
     {
         var map = Server.MapName ?? "";
-        Console.WriteLine($"[LadderWall] map='{map}', walls={_walls.Count}");
 
-        if (!map.Contains(MapPart, StringComparison.OrdinalIgnoreCase))
+        if (!_maps.TryGetValue(map, out var walls))
         {
-            Console.WriteLine("[LadderWall] map does not match, skip");
+            Console.WriteLine($"[LadderWall] no walls for map '{map}', skip");
             return;
         }
 
-        foreach (var (pos, ang) in _walls)
+        Console.WriteLine($"[LadderWall] map='{map}', walls={walls.Count}");
+
+        foreach (var (pos, ang) in walls)
         {
             var p = Spawn(pos, ang);
             if (p == null)
@@ -110,7 +119,9 @@ public class LadderWall : BasePlugin
     [RequiresPermissions("@css/root")]
     public void OnInfo(CCSPlayerController? player, CommandInfo cmd)
     {
-        player?.PrintToChat($" [wall] map='{Server.MapName}' walls={_walls.Count}");
+        var map = Server.MapName ?? "";
+        var count = _maps.TryGetValue(map, out var w) ? w.Count : 0;
+        player?.PrintToChat($" [wall] map='{map}' walls={count}");
     }
 
     [ConsoleCommand("css_wallspawn", "Заспавнить стены сейчас")]
