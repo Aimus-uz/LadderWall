@@ -11,7 +11,7 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.2.0";
+    public override string ModuleVersion => "1.3.0";
 
     // false = стены из списка полностью невидимые, true = красные (для проверки)
     private const bool Debug = false;
@@ -26,6 +26,7 @@ public class LadderWall : BasePlugin
         ["awp_lego_2"] = new()
         {
             (new Vector(1704, 244, 92), new QAngle(0, -85, 0)),
+            (new Vector(-25, 36, 286), new QAngle(0, -89, 0)),
         },
     };
 
@@ -95,15 +96,21 @@ public class LadderWall : BasePlugin
 
     private static CBaseModelEntity? Spawn(Vector pos, QAngle ang)
     {
-        var prop = Utilities.CreateEntityByName<CPhysicsPropOverride>("prop_physics_override");
-        if (prop == null) return null;
+        // prop_dynamic + модель через keyvalues при спавне. Раньше SetModel вызывался ДО спавна
+        // (prop_physics_override) - движок писал "Assertion Failed ... SetupModel ... EF_IN_STAGING_LIST"
+        var prop = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic_override");
+        if (prop == null || !prop.IsValid) return null;
+
+        using (var kv = new CEntityKeyValues())
+        {
+            kv.SetString("model", Model);
+            kv.SetInt("solid", 6); // SOLID_VPHYSICS: твёрдая, не двигается
+            prop.DispatchSpawn(kv);
+        }
+        if (!prop.IsValid) return null;
 
         prop.SetModel(Model);
         prop.Teleport(pos, ang, new Vector(0, 0, 0));
-        prop.DispatchSpawn();
-
-        // заморозить: твёрдый, но не двигается
-        prop.AcceptInput("DisableMotion");
 
         // не получает урон: выстрелы и гранаты не сломают и не сдвинут коробку
         prop.TakesDamage = false;
