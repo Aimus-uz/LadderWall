@@ -11,7 +11,7 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.1.1";
+    public override string ModuleVersion => "1.2.0";
 
     // false = стены из списка полностью невидимые, true = красные (для проверки)
     private const bool Debug = false;
@@ -22,14 +22,10 @@ public class LadderWall : BasePlugin
     private readonly Dictionary<string, List<(Vector pos, QAngle ang)>> _maps =
         new(StringComparer.OrdinalIgnoreCase)
     {
+        // awp_lego_2 (и её варианты в названии, например awp_lego_2_v2)
         ["awp_lego_2"] = new()
         {
             (new Vector(1704, 244, 92), new QAngle(0, -85, 0)),
-        },
-
-        ["awp_lego_2_winter"] = new()
-        {
-            (new Vector(-88, 5, 311), new QAngle(0, -81, 0)),
         },
     };
 
@@ -51,11 +47,15 @@ public class LadderWall : BasePlugin
     {
         var map = Server.MapName ?? "";
 
-        if (!_maps.TryGetValue(map, out var walls))
+        var walls = FindWalls(map, out var key);
+        if (walls == null)
         {
             Console.WriteLine($"[LadderWall] no walls for map '{map}', skip");
             return;
         }
+
+        if (!string.Equals(key, map, StringComparison.OrdinalIgnoreCase))
+            Console.WriteLine($"[LadderWall] map='{map}' uses walls of '{key}'");
 
         Console.WriteLine($"[LadderWall] map='{map}', walls={walls.Count}");
 
@@ -76,6 +76,23 @@ public class LadderWall : BasePlugin
         }
     }
 
+    // Сначала точное название карты, иначе самый длинный ключ, который входит в название
+    // (например awp_lego_2_v2 -> стены awp_lego_2)
+    private List<(Vector pos, QAngle ang)>? FindWalls(string map, out string key)
+    {
+        key = map;
+        if (_maps.TryGetValue(map, out var exact)) return exact;
+
+        var best = _maps.Keys
+            .Where(k => map.Contains(k, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(k => k.Length)
+            .FirstOrDefault();
+
+        if (best == null) return null;
+        key = best;
+        return _maps[best];
+    }
+
     private static CBaseModelEntity? Spawn(Vector pos, QAngle ang)
     {
         var prop = Utilities.CreateEntityByName<CPhysicsPropOverride>("prop_physics_override");
@@ -87,6 +104,9 @@ public class LadderWall : BasePlugin
 
         // заморозить: твёрдый, но не двигается
         prop.AcceptInput("DisableMotion");
+
+        // не получает урон: выстрелы и гранаты не сломают и не сдвинут коробку
+        prop.TakesDamage = false;
 
         // полностью невидимый
         prop.Render = Color.FromArgb(0, 255, 255, 255);
@@ -120,8 +140,8 @@ public class LadderWall : BasePlugin
     public void OnInfo(CCSPlayerController? player, CommandInfo cmd)
     {
         var map = Server.MapName ?? "";
-        var count = _maps.TryGetValue(map, out var w) ? w.Count : 0;
-        player?.PrintToChat($" [wall] map='{map}' walls={count}");
+        var w = FindWalls(map, out var key);
+        player?.PrintToChat($" [wall] map='{map}' key='{(w == null ? "-" : key)}' walls={w?.Count ?? 0}");
     }
 
     [ConsoleCommand("css_wallspawn", "Заспавнить стены сейчас")]
