@@ -11,7 +11,7 @@ namespace LadderWall;
 public class LadderWall : BasePlugin
 {
     public override string ModuleName => "LadderWall";
-    public override string ModuleVersion => "1.3.0";
+    public override string ModuleVersion => "1.4.0";
 
     // false = стены из списка полностью невидимые, true = красные (для проверки)
     private const bool Debug = false;
@@ -42,6 +42,40 @@ public class LadderWall : BasePlugin
             AddTimer(1.0f, SpawnWalls);
             return HookResult.Continue;
         });
+
+        // awp_lego maps hand out a Desert Eagle on spawn (game_player_equip of the map) - only the AWP is wanted
+        RegisterEventHandler<EventPlayerSpawn>((e, i) =>
+        {
+            var player = e.Userid;
+            if (player == null || !player.IsValid) return HookResult.Continue;
+            AddTimer(0.3f, () => StripMapPistol(player));
+            return HookResult.Continue;
+        });
+    }
+
+    // Item definition indexes of the pistols the map gives (1 = Desert Eagle; the R8 is 64, it is not touched)
+    private static readonly HashSet<int> StripDefIndexes = [1];
+
+    private void StripMapPistol(CCSPlayerController player)
+    {
+        if (!player.IsValid || !player.PawnIsAlive) return;
+        if (FindWalls(Server.MapName ?? "", out _) == null) return; // only on the maps of this plugin (awp_lego)
+
+        var weapons = player.PlayerPawn.Value?.WeaponServices?.MyWeapons;
+        if (weapons == null) return;
+
+        bool removed = false;
+        foreach (var handle in weapons)
+        {
+            var weapon = handle?.Value;
+            if (weapon == null || !weapon.IsValid) continue;
+            if (!StripDefIndexes.Contains(weapon.AttributeManager.Item.ItemDefinitionIndex)) continue;
+            weapon.AddEntityIOEvent("Kill", weapon, null, "", 0.0f);
+            removed = true;
+        }
+
+        if (removed && !player.IsBot)
+            Server.NextFrame(() => { if (player.IsValid) player.ExecuteClientCommand("slot1"); });
     }
 
     private void SpawnWalls()
